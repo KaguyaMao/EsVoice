@@ -1,0 +1,10 @@
+{
+  "key.categories.esvoice": "Esvoice 语音",
+  "key.esvoice.public_voice": "公共麦（按住说话）",
+  "key.esvoice.squad_voice": "班组小队麦（按住说话）",
+  "key.esvoice.command_voice": "指挥频道麦（按住说话）",
+  "key.esvoice.voice_settings": "语音频道设置",
+  "hud.esvoice.channel.public": "公共",
+  "hud.esvoice.channel.squad": "班组",
+  "hud.esvoice.channel.command": "指挥"
+}

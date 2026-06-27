@@ -1,0 +1,10 @@
+{
+  "key.categories.esvoice": "Esvoice Voice",
+  "key.esvoice.public_voice": "Public Voice (Push to Talk)",
+  "key.esvoice.squad_voice": "Squad Radio (Push to Talk)",
+  "key.esvoice.command_voice": "Command Radio (Push to Talk)",
+  "key.esvoice.voice_settings": "Voice Channel Settings",
+  "hud.esvoice.channel.public": "Public",
+  "hud.esvoice.channel.squad": "Squad",
+  "hud.esvoice.channel.command": "Command"
+}
