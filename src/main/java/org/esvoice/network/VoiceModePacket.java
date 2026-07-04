@@ -23,8 +23,8 @@ public record VoiceModePacket(VoiceChannel channel) {
         ServerPlayer sender = context.getSender();
         if (sender != null) {
             context.enqueueWork(() -> {
-                VoiceChannelRouter.setRequestedChannel(sender, packet.channel);
-                EsvoiceNetwork.acknowledgeMode(sender, new VoiceModeAckPacket(packet.channel));
+                VoiceChannel confirmedChannel = VoiceChannelRouter.setRequestedChannel(sender, packet.channel);
+                EsvoiceNetwork.acknowledgeMode(sender, new VoiceModeAckPacket(confirmedChannel));
             });
         }
         context.setPacketHandled(true);

@@ -3,8 +3,8 @@ Specification-Title: esvoice
 Specification-Vendor: 
 Specification-Version: 1
 Implementation-Title: Esvoice
-Implementation-Version: 1.0-SNAPSHOT
+Implementation-Version: 0.0.1-final
 Implementation-Vendor: 
-Implementation-Timestamp: 2026-06-28T01:12:24+0800
+Implementation-Timestamp: 2026-07-04T13:12:12+0800
 MixinConfigs: esvoice.mixins.json
 

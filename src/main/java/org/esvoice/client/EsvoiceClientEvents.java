@@ -7,12 +7,16 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import de.maxhenkel.voicechat.voice.client.ClientManager;
 import de.maxhenkel.voicechat.voice.client.ClientPlayerStateManager;
-import org.espetro.client.gui.ClientTacticalState;
 import org.esvoice.Esvoice;
 import org.esvoice.voice.VoiceChannel;
 
+import java.util.UUID;
+
 @Mod.EventBusSubscriber(modid = Esvoice.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class EsvoiceClientEvents {
+
+    private static UUID cachedPlayerId;
+    private static String cachedPlayerName;
 
     private EsvoiceClientEvents() {
     }
@@ -42,12 +46,17 @@ public final class EsvoiceClientEvents {
 
         if (connected && RadioTransmitController.shouldActivateMicrophone()) {
             VoiceChannel activeChannel = RadioTransmitController.getActiveChannel();
-            boolean shouldShowName = activeChannel != VoiceChannel.SQUAD || ClientTacticalState.isInSquad();
-            if (shouldShowName) {
-                ClientPlayerStateManager state = ClientManager.getPlayerStateManager();
-                VoiceSpeakerHud.onLocalTransmit(minecraft.player.getUUID(), minecraft.player.getName().getString(),
-                        activeChannel, state.isMuted(), state.isDisabled());
+            ClientPlayerStateManager state = ClientManager.getPlayerStateManager();
+            UUID playerId = minecraft.player.getUUID();
+            if (!playerId.equals(cachedPlayerId)) {
+                cachedPlayerId = playerId;
+                cachedPlayerName = minecraft.player.getName().getString();
             }
+            VoiceSpeakerHud.onLocalTransmit(playerId, cachedPlayerName,
+                    activeChannel, state.isMuted(), state.isDisabled());
+        } else if (!connected) {
+            cachedPlayerId = null;
+            cachedPlayerName = null;
         }
     }
 

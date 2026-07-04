@@ -76,6 +76,6 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "espetro"
 mandatory = true
-versionRange = "[1.0.0,)"
+versionRange = "[${espetro_version},)"
 ordering = "AFTER"
 side = "BOTH"

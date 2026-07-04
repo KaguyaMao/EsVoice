@@ -17,7 +17,7 @@ license = "MIT"
 # The modid of the mod
 modId = "esvoice" #mandatory
 # The version number of the mod
-version = "1.0-SNAPSHOT" #mandatory
+version = "0.0.1-final" #mandatory
 # A display name for the mod
 displayName = "Esvoice" #mandatory
 # A URL to query for updates for this mod. See the JSON update specification https://docs.minecraftforge.net/en/latest/misc/updatechecker/
@@ -76,6 +76,6 @@ side = "BOTH"
 [[dependencies."esvoice"]]
 modId = "espetro"
 mandatory = true
-versionRange = "[1.0.0,)"
+versionRange = "[1.0.2-final,)"
 ordering = "AFTER"
 side = "BOTH"

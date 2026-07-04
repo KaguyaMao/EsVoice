@@ -147,7 +147,7 @@ dependencies {
     implementation fg.deobf("curse.maven:mutil-351914:7772906")
     // Local production mod JARs are obfuscated and must be remapped for the
     // mapped Forge development environment.
-    implementation fg.deobf("org:espetro:1.0.0-final")
+    implementation fg.deobf("org:espetro:${espetro_version}")
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -160,7 +160,7 @@ tasks.named('processResources', ProcessResources).configure {
                              loader_version_range: loader_version_range,
                              voicechat_api_version: voicechat_api_version,
                              mod_id              : mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
-                             mod_authors         : mod_authors, mod_description: mod_description,]
+                             mod_authors         : mod_authors, mod_description: mod_description, espetro_version: espetro_version,]
 
     inputs.properties replaceProperties
 

@@ -12,7 +12,8 @@ import java.util.Optional;
 
 public final class EsvoiceNetwork {
 
-    private static final String PROTOCOL = "1";
+    // Version 2 uses name-less HUD refresh packets after the first packet of a speaking burst.
+    private static final String PROTOCOL = "2";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(Esvoice.MODID, "main"),
             () -> PROTOCOL,

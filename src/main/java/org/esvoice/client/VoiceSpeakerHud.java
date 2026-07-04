@@ -8,9 +8,8 @@ import net.minecraft.resources.ResourceLocation;
 import org.espetro.client.gui.ClientTacticalState;
 import org.esvoice.voice.VoiceChannel;
 
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,20 +37,30 @@ public final class VoiceSpeakerHud {
     }
 
     private static void onSpeaking(UUID speakerId, String speakerName, VoiceChannel channel, String status) {
-        ACTIVE_SPEAKERS.put(speakerId,
-                new SpeakerEntry(speakerId, speakerName, channel, status,
-                        System.currentTimeMillis() + DISPLAY_MILLIS));
+        SpeakerEntry entry = ACTIVE_SPEAKERS.get(speakerId);
+        if (entry == null) {
+            // Name-less packets are refreshes, but resolve a defensive fallback if the initial packet
+            // was missed during a client world transition.
+            String resolvedName = speakerName != null ? speakerName : resolveName(speakerId);
+            entry = new SpeakerEntry(speakerId, resolvedName);
+            ACTIVE_SPEAKERS.put(speakerId, entry);
+        } else if (speakerName != null) {
+            entry.name = speakerName;
+        }
+        entry.channel = channel;
+        entry.status = status;
+        entry.expiresAt = System.currentTimeMillis() + DISPLAY_MILLIS;
     }
 
-    public static void render(GuiGraphics graphics) {
+    public static synchronized void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.options.hideGui || minecraft.player == null) {
             return;
         }
 
-        List<SpeakerEntry> speakers = activeSnapshot();
-        int y = graphics.guiHeight() - BOTTOM_MARGIN - speakers.size() * ROW_HEIGHT;
-        for (SpeakerEntry speaker : speakers) {
+        removeExpired(System.currentTimeMillis());
+        int y = graphics.guiHeight() - BOTTOM_MARGIN - ACTIVE_SPEAKERS.size() * ROW_HEIGHT;
+        for (SpeakerEntry speaker : ACTIVE_SPEAKERS.values()) {
             int textWidth = minecraft.font.width(speaker.name) + minecraft.font.width(speaker.status);
             int width = AVATAR_SIZE + 8 + textWidth;
 
@@ -69,10 +78,24 @@ public final class VoiceSpeakerHud {
         }
     }
 
-    private static synchronized List<SpeakerEntry> activeSnapshot() {
-        long now = System.currentTimeMillis();
-        ACTIVE_SPEAKERS.values().removeIf(entry -> entry.expiresAt < now);
-        return new ArrayList<>(ACTIVE_SPEAKERS.values());
+    private static void removeExpired(long now) {
+        Iterator<SpeakerEntry> iterator = ACTIVE_SPEAKERS.values().iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().expiresAt < now) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private static String resolveName(UUID speakerId) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.getConnection() != null) {
+            PlayerInfo info = minecraft.getConnection().getPlayerInfo(speakerId);
+            if (info != null) {
+                return info.getProfile().getName();
+            }
+        }
+        return speakerId.toString();
     }
 
     private static int nameColor(SpeakerEntry speaker) {
@@ -100,6 +123,16 @@ public final class VoiceSpeakerHud {
         graphics.blit(skin, x, y, AVATAR_SIZE, AVATAR_SIZE, 40F, 8F, 8, 8, 64, 64);
     }
 
-    private record SpeakerEntry(UUID id, String name, VoiceChannel channel, String status, long expiresAt) {
+    private static final class SpeakerEntry {
+        private final UUID id;
+        private String name;
+        private VoiceChannel channel = VoiceChannel.PUBLIC;
+        private String status = "";
+        private long expiresAt;
+
+        private SpeakerEntry(UUID id, String name) {
+            this.id = id;
+            this.name = name;
+        }
     }
 }
