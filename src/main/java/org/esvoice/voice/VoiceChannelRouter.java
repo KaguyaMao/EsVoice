@@ -12,9 +12,8 @@ import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import org.espetro.Espetro;
+import org.espetro.api.EspetroAPI;
 import org.espetro.team.SquadManager;
-import org.espetro.team.VoteManager;
 import org.esvoice.network.EsvoiceNetwork;
 import org.esvoice.network.VoiceModeAckPacket;
 import org.esvoice.network.VoiceSpeakingPacket;
@@ -35,7 +34,6 @@ public final class VoiceChannelRouter {
     private static final Component NOT_IN_SQUAD_MESSAGE = Component.literal("§c未加入小队");
     private static final Component COMMAND_DENIED_MESSAGE =
             Component.literal("§c只有小队队长和阵营指挥官可以使用指挥频道。");
-    private static final String[] KNOWN_TEAMS = {"ATTACK", "DEFEND"};
     private static final Map<UUID, VoiceChannel> REQUESTED_CHANNELS = new ConcurrentHashMap<>();
     private static final Map<UUID, PendingRadioStream> PENDING_RADIO_STREAMS = new ConcurrentHashMap<>();
     private static final Map<UUID, SpeakerHudState> HUD_STATES = new ConcurrentHashMap<>();
@@ -60,11 +58,11 @@ public final class VoiceChannelRouter {
             return VoiceChannel.PUBLIC;
         }
 
-        if (requestedChannel == VoiceChannel.SQUAD && getPlayerSquadId(player) == SquadManager.NO_SQUAD) {
+        if (requestedChannel == VoiceChannel.SQUAD && getPlayerSquadId(player.getUUID()) == SquadManager.NO_SQUAD) {
             denyRadio(player, NOT_IN_SQUAD_MESSAGE);
             return VoiceChannel.PUBLIC;
         }
-        if (requestedChannel == VoiceChannel.COMMAND && !isCommandAuthorized(player)) {
+        if (requestedChannel == VoiceChannel.COMMAND && !isCommandAuthorized(player.getUUID())) {
             denyRadio(player, COMMAND_DENIED_MESSAGE);
             return VoiceChannel.PUBLIC;
         }
@@ -84,13 +82,19 @@ public final class VoiceChannelRouter {
         PLAYER_ROUTES.remove(playerId);
     }
 
-    private static void onServerStarted(VoicechatServerStartedEvent event) {
+    /** Clears all routing state (match end / battlefield teardown). */
+    public static void clearAll() {
+        REQUESTED_CHANNELS.clear();
         PENDING_RADIO_STREAMS.values().forEach(PendingRadioStream::close);
         PENDING_RADIO_STREAMS.clear();
         HUD_STATES.clear();
         PLAYER_ROUTES.clear();
         routeCacheServer = null;
         routeCacheTick = Integer.MIN_VALUE;
+    }
+
+    private static void onServerStarted(VoicechatServerStartedEvent event) {
+        clearAll();
         registerCategory(event.getVoicechat(), VoiceChannel.SQUAD,
                 "班组小队频道", "同一班组小队的无线语音");
         registerCategory(event.getVoicechat(), VoiceChannel.COMMAND,
@@ -114,24 +118,33 @@ public final class VoiceChannelRouter {
         }
 
         VoiceChannel channel = REQUESTED_CHANNELS.getOrDefault(sender.getUUID(), VoiceChannel.PUBLIC);
-        if (!channel.isRadio()) {
-            return;
-        }
-
-        // Wireless transmissions must never fall through to proximity chat.
-        event.cancel();
-
         byte[] opusAudio = event.getPacket().getOpusEncodedData();
         if (opusAudio.length == 0) {
             return;
         }
 
         MinecraftServer server = sender.getServer();
-        if (server != null) {
-            UUID senderId = sender.getUUID();
-            PendingRadioStream stream = PENDING_RADIO_STREAMS.computeIfAbsent(senderId,
-                    ignored -> new PendingRadioStream(server, event.getVoicechat(), senderId));
+        if (server == null) {
+            return;
+        }
+
+        UUID senderId = sender.getUUID();
+        PendingRadioStream stream = PENDING_RADIO_STREAMS.computeIfAbsent(senderId,
+                ignored -> new PendingRadioStream(server, event.getVoicechat(), senderId));
+
+        if (channel.isRadio()) {
+            // Wireless transmissions must never fall through to proximity chat.
+            event.cancel();
             stream.enqueue(event.getPacket(), channel, opusAudio);
+            return;
+        }
+
+        // Hub (overworld) public mic is always open to every player in the lobby,
+        // not gated by Espetro faction or proximity. Spectators also need our path
+        // because SVC defaults spectator_interaction=false under MatchHold.
+        if (isHub(sender) || sender.isSpectator()) {
+            event.cancel();
+            stream.enqueue(event.getPacket(), VoiceChannel.PUBLIC, opusAudio);
         }
     }
 
@@ -148,11 +161,17 @@ public final class VoiceChannelRouter {
             return;
         }
 
+        if (channel == VoiceChannel.PUBLIC) {
+            routePublicPacket(server, api, sender, senderRoute, packet);
+            return;
+        }
+
         if (channel == VoiceChannel.SQUAD) {
             routeSquadPacket(server, api, sender, senderRoute, packet);
             return;
         }
 
+        // COMMAND
         String senderTeam = senderRoute.team;
         if (senderTeam == null) {
             return;
@@ -165,11 +184,8 @@ public final class VoiceChannelRouter {
         for (ServerPlayer listener : server.getPlayerList().getPlayers()) {
             PlayerRoute listenerRoute = PLAYER_ROUTES.get(listener.getUUID());
             if (listener == sender || listenerRoute == null
-                    || !Objects.equals(senderTeam, listenerRoute.team)) {
-                continue;
-            }
-
-            if (!listenerRoute.commandAuthorized) {
+                    || !Objects.equals(senderTeam, listenerRoute.team)
+                    || !listenerRoute.commandAuthorized) {
                 continue;
             }
 
@@ -179,8 +195,60 @@ public final class VoiceChannelRouter {
             }
 
             api.sendStaticSoundPacketTo(connection, packet);
-            notifyHud(listener, sender, channel);
+            notifyHud(listener, sender, VoiceChannel.COMMAND);
         }
+    }
+
+    private static void routePublicPacket(MinecraftServer server, VoicechatServerApi api, ServerPlayer sender,
+                                          PlayerRoute senderRoute, StaticSoundPacket packet) {
+        boolean hub = isHub(sender);
+        String senderTeam = senderRoute.team;
+        double range = Math.max(1.0D, api.getBroadcastRange());
+        double rangeSq = range * range;
+        // Spectators should still be audible at their camera position; use eye height.
+        double senderX = sender.getX();
+        double senderY = sender.getEyeY();
+        double senderZ = sender.getZ();
+
+        for (ServerPlayer listener : server.getPlayerList().getPlayers()) {
+            if (listener == sender || listener.level() != sender.level()) {
+                continue;
+            }
+            // Lobby: every player in the hub dimension hears public mic, no range/team gate.
+            if (!hub) {
+                if (listener.distanceToSqr(senderX, senderY, senderZ) > rangeSq) {
+                    continue;
+                }
+
+                PlayerRoute listenerRoute = PLAYER_ROUTES.get(listener.getUUID());
+                if (listenerRoute == null) {
+                    continue;
+                }
+                // Same-faction only when both sides have a faction. Unassigned players
+                // still hear each other so voice is not muted by missing Espetro state.
+                if (senderTeam != null && listenerRoute.team != null
+                        && !Objects.equals(senderTeam, listenerRoute.team)) {
+                    continue;
+                }
+            }
+
+            PlayerRoute listenerRoute = PLAYER_ROUTES.get(listener.getUUID());
+            VoicechatConnection connection = listenerRoute != null
+                    ? listenerRoute.connection
+                    : api.getConnectionOf(listener.getUUID());
+            if (connection == null || !connection.isConnected() || connection.isDisabled()) {
+                continue;
+            }
+
+            api.sendStaticSoundPacketTo(connection, packet);
+            notifyHud(listener, sender, VoiceChannel.PUBLIC);
+        }
+    }
+
+    /** Espetro hub / lobby lives in the overworld; battlefield maps use other dimensions. */
+    private static boolean isHub(ServerPlayer player) {
+        return player != null && player.level() != null
+                && net.minecraft.world.level.Level.OVERWORLD.equals(player.level().dimension());
     }
 
     private static void routeSquadPacket(MinecraftServer server, VoicechatServerApi api, ServerPlayer sender,
@@ -193,7 +261,9 @@ public final class VoiceChannelRouter {
 
         for (ServerPlayer listener : server.getPlayerList().getPlayers()) {
             PlayerRoute listenerRoute = PLAYER_ROUTES.get(listener.getUUID());
-            if (listener == sender || listenerRoute == null || listenerRoute.squadId != senderSquad) {
+            if (listener == sender || listenerRoute == null
+                    || !Objects.equals(senderRoute.team, listenerRoute.team)
+                    || listenerRoute.squadId != senderSquad) {
                 continue;
             }
 
@@ -218,76 +288,15 @@ public final class VoiceChannelRouter {
     }
 
     private static String getPlayerTeam(ServerPlayer player) {
-        return Espetro.getPlayerTeam(player);
+        return EspetroAPI.getPlayerTeam(player);
     }
 
     private static int getPlayerSquadId(UUID playerId) {
-        return SquadManager.getInstance().getPlayerSquadId(playerId);
+        return EspetroAPI.getPlayerSquadId(playerId);
     }
 
-    private static int getPlayerSquadId(ServerPlayer player) {
-        int squadId = getPlayerSquadId(player.getUUID());
-        if (squadId != SquadManager.NO_SQUAD) {
-            return squadId;
-        }
-
-        String team = getPlayerTeam(player);
-        if (team != null) {
-            squadId = findPlayerSquadId(player.getUUID(), team);
-            if (squadId != SquadManager.NO_SQUAD) {
-                return squadId;
-            }
-        }
-
-        for (String knownTeam : KNOWN_TEAMS) {
-            squadId = findPlayerSquadId(player.getUUID(), knownTeam);
-            if (squadId != SquadManager.NO_SQUAD) {
-                return squadId;
-            }
-        }
-        return SquadManager.NO_SQUAD;
-    }
-
-    private static int findPlayerSquadId(UUID playerId, String team) {
-        for (SquadManager.SquadSnapshot squad : SquadManager.getInstance().getSquadSnapshots(team)) {
-            for (SquadManager.MemberSnapshot member : squad.members) {
-                if (playerId.equals(member.uuid)) {
-                    return squad.id;
-                }
-            }
-        }
-        return SquadManager.NO_SQUAD;
-    }
-
-    private static boolean isCommandAuthorized(ServerPlayer player) {
-        return isSquadLeader(player) || VoteManager.getInstance().isCommander(player.getUUID());
-    }
-
-    private static boolean isSquadLeader(ServerPlayer player) {
-        int squadId = getPlayerSquadId(player);
-        String team = getPlayerTeam(player);
-        return isSquadLeader(player.getUUID(), squadId, team);
-    }
-
-    private static boolean isSquadLeader(UUID playerId, int squadId, String team) {
-        if (squadId == SquadManager.NO_SQUAD) {
-            return false;
-        }
-        if (team == null) {
-            return false;
-        }
-
-        for (SquadManager.SquadSnapshot squad : SquadManager.getInstance().getSquadSnapshots(team)) {
-            if (squad.id != squadId) {
-                continue;
-            }
-            for (SquadManager.MemberSnapshot member : squad.members) {
-                if (playerId.equals(member.uuid) && member.leader) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    private static boolean isCommandAuthorized(UUID playerId) {
+        return SquadManager.getInstance().isSquadLeader(playerId) || EspetroAPI.isCommander(playerId);
     }
 
     private static void refreshPlayerRoutes(MinecraftServer server, VoicechatServerApi api) {
@@ -305,13 +314,15 @@ public final class VoiceChannelRouter {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             UUID playerId = player.getUUID();
             String team = getPlayerTeam(player);
-            int squadId = getPlayerSquadId(player);
-            boolean commandAuthorized = isSquadLeader(playerId, squadId, team)
-                    || VoteManager.getInstance().isCommander(playerId);
+            int squadId = getPlayerSquadId(playerId);
+            boolean squadLeader = SquadManager.getInstance().isSquadLeader(playerId);
+            boolean commander = EspetroAPI.isCommander(playerId);
             PlayerRoute route = PLAYER_ROUTES.computeIfAbsent(playerId, ignored -> new PlayerRoute());
             route.team = team;
             route.squadId = squadId;
-            route.commandAuthorized = commandAuthorized;
+            route.squadLeader = squadLeader;
+            route.commander = commander;
+            route.commandAuthorized = squadLeader || commander;
             route.connection = api.getConnectionOf(playerId);
         }
     }
@@ -327,6 +338,19 @@ public final class VoiceChannelRouter {
         if (senderConnection == null || receiverConnection == null
                 || !(senderConnection.getPlayer().getPlayer() instanceof ServerPlayer sender)
                 || !(receiverConnection.getPlayer().getPlayer() instanceof ServerPlayer listener)) {
+            return;
+        }
+        // Hub public proximity (if any packet still uses the default path) is open to everyone.
+        if (isHub(sender) || isHub(listener)) {
+            notifyHud(listener, sender, VoiceChannel.PUBLIC);
+            return;
+        }
+        String senderTeam = getPlayerTeam(sender);
+        String listenerTeam = getPlayerTeam(listener);
+        // Enemy factions never hear each other. Missing team is allowed so unassigned
+        // players are not effectively muted by Espetro state.
+        if (senderTeam != null && listenerTeam != null && !Objects.equals(senderTeam, listenerTeam)) {
+            event.cancel();
             return;
         }
         notifyHud(listener, sender, VoiceChannel.PUBLIC);
@@ -391,6 +415,8 @@ public final class VoiceChannelRouter {
         private String team;
         private int squadId = SquadManager.NO_SQUAD;
         private boolean commandAuthorized;
+        private boolean squadLeader;
+        private boolean commander;
         private VoicechatConnection connection;
     }
 
@@ -401,6 +427,7 @@ public final class VoiceChannelRouter {
         private final MinecraftServer server;
         private final VoicechatServerApi api;
         private final UUID senderId;
+        private final UUID publicChannelId;
         private final UUID squadChannelId;
         private final UUID commandChannelId;
         private final ArrayDeque<RadioFrame> frames = new ArrayDeque<>(MAX_PENDING_FRAMES_PER_PLAYER);
@@ -411,17 +438,26 @@ public final class VoiceChannelRouter {
             this.server = server;
             this.api = api;
             this.senderId = senderId;
+            this.publicChannelId = channelId(senderId, VoiceChannel.PUBLIC);
             this.squadChannelId = channelId(senderId, VoiceChannel.SQUAD);
             this.commandChannelId = channelId(senderId, VoiceChannel.COMMAND);
         }
 
         private void enqueue(MicrophonePacket microphonePacket, VoiceChannel channel, byte[] opusAudio) {
-            StaticSoundPacket radioPacket = microphonePacket.staticSoundPacketBuilder()
-                    .channelId(channel == VoiceChannel.SQUAD ? squadChannelId : commandChannelId)
+            UUID streamChannelId = switch (channel) {
+                case SQUAD -> squadChannelId;
+                case COMMAND -> commandChannelId;
+                case PUBLIC -> publicChannelId;
+            };
+            var builder = microphonePacket.staticSoundPacketBuilder()
+                    .channelId(streamChannelId)
                     // The voice-chat event owns its input array; queued frames need an independent lifetime.
-                    .opusEncodedData(opusAudio.clone())
-                    .category(channel.getCategoryId())
-                    .build();
+                    .opusEncodedData(opusAudio.clone());
+            String category = channel.getCategoryId();
+            if (category != null && !category.isEmpty()) {
+                builder.category(category);
+            }
+            StaticSoundPacket radioPacket = builder.build();
 
             synchronized (this) {
                 if (closed) {

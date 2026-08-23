@@ -74,8 +74,20 @@ versionRange = "[6.1.1,)"
 ordering = "AFTER"
 side = "BOTH"
 [[dependencies."esvoice"]]
+modId = "oelib"
+mandatory = true
+versionRange = "[0.2.4,)"
+ordering = "AFTER"
+side = "BOTH"
+[[dependencies."esvoice"]]
+modId = "auratip"
+mandatory = true
+versionRange = "[1.1.1-beta,)"
+ordering = "AFTER"
+side = "BOTH"
+[[dependencies."esvoice"]]
 modId = "espetro"
 mandatory = true
-versionRange = "[1.0.6-final,)"
+versionRange = "[1.1.0-alpha,)"
 ordering = "AFTER"
 side = "BOTH"

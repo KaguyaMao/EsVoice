@@ -31,6 +31,10 @@ public enum VoiceChannel {
         return this != PUBLIC;
     }
 
+    /**
+     * Maps a wire id to a channel. Unknown ids (including the removed DIRECT id 3)
+     * fall back to {@link #PUBLIC}.
+     */
     public static VoiceChannel fromId(int id) {
         for (VoiceChannel channel : values()) {
             if (channel.id == id) {

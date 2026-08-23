@@ -18,9 +18,28 @@ public final class EsvoiceClientModEvents {
     public static final KeyMapping SQUAD_VOICE = new KeyMapping(
             "key.esvoice.squad_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, "key.categories.esvoice");
     public static final KeyMapping COMMAND_VOICE = new KeyMapping(
-            "key.esvoice.command_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, "key.categories.esvoice");
+            "key.esvoice.command_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, "key.categories.esvoice");
     public static final KeyMapping VOICE_SETTINGS = new KeyMapping(
             "key.esvoice.voice_settings", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, "key.categories.esvoice");
+    public static final KeyMapping MUTE_MICROPHONE = new KeyMapping(
+            "key.esvoice.mute_microphone", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_M, "key.categories.esvoice");
+    public static final KeyMapping DISABLE_VOICE = new KeyMapping(
+            "key.esvoice.disable_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, "key.categories.esvoice");
+    public static final KeyMapping TOGGLE_HUD = new KeyMapping(
+            "key.esvoice.toggle_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, "key.categories.esvoice");
+    public static final KeyMapping TOGGLE_RECORDING = new KeyMapping(
+            "key.esvoice.toggle_recording", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "key.categories.esvoice");
+
+    public static final KeyMapping[] ALL_KEYS = {
+            PUBLIC_VOICE,
+            SQUAD_VOICE,
+            COMMAND_VOICE,
+            VOICE_SETTINGS,
+            MUTE_MICROPHONE,
+            DISABLE_VOICE,
+            TOGGLE_HUD,
+            TOGGLE_RECORDING
+    };
 
     private EsvoiceClientModEvents() {
     }
@@ -31,6 +50,10 @@ public final class EsvoiceClientModEvents {
         event.register(SQUAD_VOICE);
         event.register(COMMAND_VOICE);
         event.register(VOICE_SETTINGS);
+        event.register(MUTE_MICROPHONE);
+        event.register(DISABLE_VOICE);
+        event.register(TOGGLE_HUD);
+        event.register(TOGGLE_RECORDING);
     }
 
     @SubscribeEvent

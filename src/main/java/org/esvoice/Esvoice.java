@@ -28,6 +28,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import org.espetro.api.event.BattlefieldLifecycleEvent;
 import org.slf4j.Logger;
 import org.esvoice.network.EsvoiceNetwork;
 import org.esvoice.voice.VoiceChannelRouter;
@@ -118,6 +119,11 @@ public class Esvoice {
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         VoiceChannelRouter.clearPlayer(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public void onBattlefieldCleared(BattlefieldLifecycleEvent.Cleared event) {
+        VoiceChannelRouter.clearAll();
     }
 
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent

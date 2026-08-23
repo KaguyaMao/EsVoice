@@ -36,6 +36,10 @@ public final class VoiceNameTagIconFilter {
         if (target == minecraft.player || target.getUUID().equals(minecraft.player.getUUID())) {
             return true;
         }
+        // Lobby / hub: show speak icons for everyone so public mic is not faction-gated.
+        if (net.minecraft.world.level.Level.OVERWORLD.equals(minecraft.level.dimension())) {
+            return true;
+        }
         return isSameEspetroTeam(minecraft.player, target);
     }
 

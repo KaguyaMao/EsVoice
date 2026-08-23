@@ -12,8 +12,8 @@ import java.util.Optional;
 
 public final class EsvoiceNetwork {
 
-    // Version 2 uses name-less HUD refresh packets after the first packet of a speaking burst.
-    private static final String PROTOCOL = "2";
+    // Version 4 drops the DIRECT channel and the VoiceModePacket target-squad field.
+    private static final String PROTOCOL = "4";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(Esvoice.MODID, "main"),
             () -> PROTOCOL,

@@ -132,22 +132,45 @@ repositories {
     maven {
         url = "https://cursemaven.com"
     }
+    maven {
+        name = "Sighs Releases"
+        url = "https://maven.sighs.cc/repository/maven-releases/"
+        content {
+            includeGroup "cc.sighs.auratip"
+            includeGroup "cc.sighs.oelib"
+        }
+    }
     flatDir {
-        dirs '../Espetro/build/libs', 'libs'
+        dirs '../../Java/Projects/Espetro/build/libs', 'libs'
     }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-
     implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
-    compileOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-${voicechat_version}")
-    runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-${voicechat_version}")
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
-    implementation fg.deobf("curse.maven:mutil-351914:7772906")
-    // Local production mod JARs are obfuscated and must be remapped for the
-    // mapped Forge development environment.
-    implementation fg.deobf("org:espetro:${espetro_version}")
+
+    // Compile against mapped jars already in FG cache / Espetro build output
+    def fgDeobf = file("/home/shu/.gradle/caches/forge_gradle/deobf_dependencies")
+    implementation fileTree(fgDeobf) {
+        include "**/mutil*mapped_official_1.20.1.jar"
+        include "**/OELib*mapped_official_1.20.1.jar"
+        include "**/auratip*mapped_official_1.20.1.jar"
+        include "**/voicechat*mapped_official_1.20.1.jar"
+        exclude "**/*-sources.jar"
+        exclude "**/*.input"
+        exclude "**/*.sha1"
+    }
+    // Espetro: use project classes (official names) for compile
+    implementation files("/home/shu/Java/Projects/Espetro/build/classes/java/main")
+    implementation files("/home/shu/Java/Projects/Espetro/build/resources/main")
+    // Load Espetro as an actual mod in development runs so Forge can satisfy
+    // Esvoice's mandatory dependency and apply every client mixin.
+    runtimeOnly fg.deobf("org:espetro:${espetro_version}")
+    runtimeOnly fileTree(fgDeobf) {
+        include "**/rhino-forge*mapped_official_1.20.1.jar"
+        include "**/architectury-forge*mapped_official_1.20.1.jar"
+    }
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
@@ -160,7 +183,8 @@ tasks.named('processResources', ProcessResources).configure {
                              loader_version_range: loader_version_range,
                              voicechat_api_version: voicechat_api_version,
                              mod_id              : mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
-                             mod_authors         : mod_authors, mod_description: mod_description, espetro_version: espetro_version,]
+                             mod_authors         : mod_authors, mod_description: mod_description, espetro_version: espetro_version,
+                             auratip_version     : auratip_version, oelib_version: oelib_version,]
 
     inputs.properties replaceProperties
 

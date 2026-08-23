@@ -7,6 +7,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import de.maxhenkel.voicechat.voice.client.ClientManager;
 import de.maxhenkel.voicechat.voice.client.ClientPlayerStateManager;
+import de.maxhenkel.voicechat.voice.client.ClientVoicechat;
+import de.maxhenkel.voicechat.VoicechatClient;
 import org.esvoice.Esvoice;
 import org.esvoice.voice.VoiceChannel;
 
@@ -17,6 +19,7 @@ public final class EsvoiceClientEvents {
 
     private static UUID cachedPlayerId;
     private static String cachedPlayerName;
+    private static boolean tutorialShownThisConnection;
 
     private EsvoiceClientEvents() {
     }
@@ -29,8 +32,44 @@ public final class EsvoiceClientEvents {
 
         Minecraft minecraft = Minecraft.getInstance();
         boolean connected = minecraft.getConnection() != null && minecraft.player != null;
-        if (connected && minecraft.screen == null && EsvoiceClientModEvents.VOICE_SETTINGS.consumeClick()) {
+        ClientPlayerStateManager voiceState = ClientManager.getPlayerStateManager();
+        ClientVoicechat voiceClient = ClientManager.getClient();
+        boolean voiceConnected = connected
+            && !voiceState.isDisconnected()
+            && voiceClient != null
+            && voiceClient.getConnection() != null;
+        EsvoiceAuraTipNotifications.update(connected, voiceConnected);
+
+        boolean settingsClicked = EsvoiceClientModEvents.VOICE_SETTINGS.consumeClick();
+        boolean muteClicked = EsvoiceClientModEvents.MUTE_MICROPHONE.consumeClick();
+        boolean disableClicked = EsvoiceClientModEvents.DISABLE_VOICE.consumeClick();
+        boolean hudClicked = EsvoiceClientModEvents.TOGGLE_HUD.consumeClick();
+        boolean recordingClicked = EsvoiceClientModEvents.TOGGLE_RECORDING.consumeClick();
+
+        if (!connected) {
+            tutorialShownThisConnection = false;
+        } else if (voiceConnected && minecraft.screen == null && !tutorialShownThisConnection
+                && VoicechatClient.CLIENT_CONFIG != null && !EsvoiceTutorialScreen.isFinished()) {
+            tutorialShownThisConnection = true;
+            minecraft.setScreen(new EsvoiceTutorialScreen(null, false));
+        } else if (minecraft.screen == null && settingsClicked) {
             minecraft.setScreen(new EsvoiceVoiceChatScreen());
+        }
+
+        if (connected && minecraft.screen == null) {
+            if (muteClicked) {
+                voiceState.setMuted(!voiceState.isMuted());
+            }
+            if (disableClicked) {
+                voiceState.setDisabled(!voiceState.isDisabled());
+            }
+            if (hudClicked && VoicechatClient.CLIENT_CONFIG != null) {
+                VoicechatClient.CLIENT_CONFIG.hideIcons
+                        .set(!VoicechatClient.CLIENT_CONFIG.hideIcons.get()).save();
+            }
+            if (recordingClicked) {
+                toggleRecording(minecraft, voiceClient);
+            }
         }
         VoiceChannel channel = VoiceChannel.PUBLIC;
         if (connected && minecraft.screen == null) {
@@ -44,20 +83,39 @@ public final class EsvoiceClientEvents {
                 && EsvoiceClientModEvents.PUBLIC_VOICE.isDown();
         RadioTransmitController.update(channel, publicKeyDown, connected);
 
-        if (connected && RadioTransmitController.shouldActivateMicrophone()) {
+        if (voiceConnected && RadioTransmitController.shouldActivateMicrophone()
+                && !voiceState.isMuted() && !voiceState.isDisabled()) {
             VoiceChannel activeChannel = RadioTransmitController.getActiveChannel();
-            ClientPlayerStateManager state = ClientManager.getPlayerStateManager();
             UUID playerId = minecraft.player.getUUID();
             if (!playerId.equals(cachedPlayerId)) {
                 cachedPlayerId = playerId;
                 cachedPlayerName = minecraft.player.getName().getString();
             }
-            VoiceSpeakerHud.onLocalTransmit(playerId, cachedPlayerName,
-                    activeChannel, state.isMuted(), state.isDisabled());
+            VoiceSpeakerHud.onLocalTransmit(playerId, cachedPlayerName, activeChannel);
         } else if (!connected) {
             cachedPlayerId = null;
             cachedPlayerName = null;
         }
     }
 
+    private static void toggleRecording(Minecraft minecraft, ClientVoicechat client) {
+        if (client == null || client.getConnection() == null) {
+            minecraft.player.displayClientMessage(
+                    net.minecraft.network.chat.Component.translatable(
+                            "gui.esvoice.recording.not_connected"), true);
+            return;
+        }
+        if (client.getInitializationData() == null || !client.getInitializationData().allowRecording()) {
+            minecraft.player.displayClientMessage(
+                    net.minecraft.network.chat.Component.translatable(
+                            "gui.esvoice.recording.not_allowed"), true);
+            return;
+        }
+        client.toggleRecording();
+        minecraft.player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable(
+                        client.getRecorder() != null
+                                ? "gui.esvoice.recording.started"
+                                : "gui.esvoice.recording.stopped"), true);
+    }
 }
