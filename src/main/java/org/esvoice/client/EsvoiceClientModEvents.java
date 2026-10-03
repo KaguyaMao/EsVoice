@@ -13,42 +13,21 @@ import org.lwjgl.glfw.GLFW;
 @Mod.EventBusSubscriber(modid = Esvoice.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class EsvoiceClientModEvents {
 
-    public static final KeyMapping PUBLIC_VOICE = new KeyMapping(
-            "key.esvoice.public_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, "key.categories.esvoice");
-    public static final KeyMapping SQUAD_VOICE = new KeyMapping(
-            "key.esvoice.squad_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, "key.categories.esvoice");
-    public static final KeyMapping COMMAND_VOICE = new KeyMapping(
-            "key.esvoice.command_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, "key.categories.esvoice");
-    public static final KeyMapping MUTE_MICROPHONE = new KeyMapping(
-            "key.esvoice.mute_microphone", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_M, "key.categories.esvoice");
-    public static final KeyMapping DISABLE_VOICE = new KeyMapping(
-            "key.esvoice.disable_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, "key.categories.esvoice");
-    public static final KeyMapping TOGGLE_HUD = new KeyMapping(
-            "key.esvoice.toggle_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, "key.categories.esvoice");
+    /**
+     * 录音开关是 EsVoice 唯一保留的键位。
+     *
+     * <p>公共麦/小队/指挥/静音麦克风/语音总开关/发言者头像条这 6 个键位已归 espetromini 所有
+     * （{@code org.espetromini.client.MiniKeys}，由它注册，可在原版「选项 → 控制」里重绑），
+     * 本模组只轮询它们，不再自己注册。
+     */
     public static final KeyMapping TOGGLE_RECORDING = new KeyMapping(
             "key.esvoice.toggle_recording", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "key.categories.esvoice");
-
-    public static final KeyMapping[] ALL_KEYS = {
-            PUBLIC_VOICE,
-            SQUAD_VOICE,
-            COMMAND_VOICE,
-            MUTE_MICROPHONE,
-            DISABLE_VOICE,
-            TOGGLE_HUD,
-            TOGGLE_RECORDING
-    };
 
     private EsvoiceClientModEvents() {
     }
 
     @SubscribeEvent
     public static void registerKeys(RegisterKeyMappingsEvent event) {
-        event.register(PUBLIC_VOICE);
-        event.register(SQUAD_VOICE);
-        event.register(COMMAND_VOICE);
-        event.register(MUTE_MICROPHONE);
-        event.register(DISABLE_VOICE);
-        event.register(TOGGLE_HUD);
         event.register(TOGGLE_RECORDING);
     }
 

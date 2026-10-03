@@ -1,12 +1,5 @@
 {
   "key.categories.esvoice": "Esvoice Voice",
-  "key.esvoice.public_voice": "Local Voice (Push to Talk)",
-  "key.esvoice.squad_voice": "Squad Radio (Push to Talk)",
-  "key.esvoice.command_voice": "Command Radio (Push to Talk)",
-  "key.esvoice.voice_settings": "Open Voice Settings",
-  "key.esvoice.mute_microphone": "Toggle Microphone Mute",
-  "key.esvoice.disable_voice": "Toggle Voice Chat",
-  "key.esvoice.toggle_hud": "Toggle Voice HUD",
   "key.esvoice.toggle_recording": "Toggle Voice Recording",
   "hud.esvoice.channel.public": "Local",
   "hud.esvoice.channel.squad": "Squad",

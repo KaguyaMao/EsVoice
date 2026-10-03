@@ -1,12 +1,5 @@
 {
   "key.categories.esvoice": "Esvoice 语音",
-  "key.esvoice.public_voice": "本地语音（按住说话）",
-  "key.esvoice.squad_voice": "班组小队麦（按住说话）",
-  "key.esvoice.command_voice": "指挥频道麦（按住说话）",
-  "key.esvoice.voice_settings": "打开语音设置",
-  "key.esvoice.mute_microphone": "切换麦克风静音",
-  "key.esvoice.disable_voice": "切换总语音开关",
-  "key.esvoice.toggle_hud": "切换语音 HUD",
   "key.esvoice.toggle_recording": "切换语音录音",
   "hud.esvoice.channel.public": "本地",
   "hud.esvoice.channel.squad": "班组",

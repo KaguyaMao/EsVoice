@@ -9,7 +9,9 @@ import net.minecraftforge.fml.common.Mod;
 import de.maxhenkel.voicechat.voice.client.ClientManager;
 import de.maxhenkel.voicechat.voice.client.ClientPlayerStateManager;
 import de.maxhenkel.voicechat.voice.client.ClientVoicechat;
-import de.maxhenkel.voicechat.VoicechatClient;
+import org.espetromini.api.MiniClientAPI;
+import org.espetromini.client.MiniKeys;
+import org.espetromini.config.MiniClientConfig;
 import org.esvoice.Esvoice;
 import org.esvoice.voice.VoiceChannel;
 
@@ -39,46 +41,57 @@ public final class EsvoiceClientEvents {
             && voiceClient != null
             && voiceClient.getConnection() != null;
 
-        boolean muteClicked = EsvoiceClientModEvents.MUTE_MICROPHONE.consumeClick();
-        boolean disableClicked = EsvoiceClientModEvents.DISABLE_VOICE.consumeClick();
-        boolean hudClicked = EsvoiceClientModEvents.TOGGLE_HUD.consumeClick();
-        boolean recordingClicked = EsvoiceClientModEvents.TOGGLE_RECORDING.consumeClick();
-
-        if (connected && minecraft.screen == null) {
-            if (muteClicked) {
-                voiceState.setMuted(!voiceState.isMuted());
+        // 键位归 espetromini 所有（可在原版控制界面重绑）：这里只轮询点击并翻转它的持久化设置。
+        if (connected && minecraft.screen == null && MiniKeys.ready()) {
+            if (MiniKeys.MUTE_MIC.consumeClick()) {
+                MiniClientConfig.toggleMicMuted();
             }
-            if (disableClicked) {
-                voiceState.setDisabled(!voiceState.isDisabled());
+            if (MiniKeys.VOICE_TOGGLE.consumeClick()) {
+                MiniClientConfig.toggleVoiceEnabled();
             }
-            if (hudClicked && VoicechatClient.CLIENT_CONFIG != null) {
-                VoicechatClient.CLIENT_CONFIG.hideIcons
-                        .set(!VoicechatClient.CLIENT_CONFIG.hideIcons.get()).save();
+            if (MiniKeys.SPEAKER_HUD.consumeClick()) {
+                MiniClientConfig.toggleSpeakerHud();
             }
-            if (recordingClicked) {
+            if (EsvoiceClientModEvents.TOGGLE_RECORDING.consumeClick()) {
                 toggleRecording(minecraft, voiceClient);
             }
         }
+
+        boolean voiceEnabled = MiniClientAPI.voiceEnabled();
+        // 把 espetromini 的语音状态同步给 Simple Voice Chat：
+        // 总开关关闭 → 不听也不说（disabled）；麦克风静音 → 只影响"说"（muted）。
+        if (connected) {
+            boolean muted = MiniClientAPI.micMuted();
+            boolean disabled = !voiceEnabled;
+            if (voiceState.isMuted() != muted) {
+                voiceState.setMuted(muted);
+            }
+            if (voiceState.isDisabled() != disabled) {
+                voiceState.setDisabled(disabled);
+            }
+        }
+
+        // 总开关关闭时强制回到公共麦且不发麦克风；不影响其它玩家（状态只存在本地）。
         VoiceChannel channel = VoiceChannel.PUBLIC;
-        if (connected && minecraft.screen == null) {
-            if (EsvoiceClientModEvents.COMMAND_VOICE.isDown()) {
+        if (connected && minecraft.screen == null && voiceEnabled && MiniKeys.ready()) {
+            if (MiniKeys.COMMAND_VOICE.isDown()) {
                 channel = VoiceChannel.COMMAND;
-            } else if (EsvoiceClientModEvents.SQUAD_VOICE.isDown()) {
+            } else if (MiniKeys.SQUAD_VOICE.isDown()) {
                 channel = VoiceChannel.SQUAD;
             }
         }
         // 界面打开时 KeyMapping 不会更新，改用 GLFW 直接轮询（聊天框里打字时不抢按键）。
-        boolean publicKeyDown;
-        if (minecraft.screen == null) {
-            publicKeyDown = connected && EsvoiceClientModEvents.PUBLIC_VOICE.isDown();
-        } else {
-            publicKeyDown = connected
-                    && !(minecraft.screen instanceof ChatScreen)
-                    && EsvoiceVoiceKeys.isBindingHeld(EsvoiceClientModEvents.PUBLIC_VOICE);
+        boolean publicKeyDown = false;
+        if (connected && voiceEnabled && MiniKeys.ready()) {
+            if (minecraft.screen == null) {
+                publicKeyDown = MiniKeys.PUBLIC_VOICE.isDown();
+            } else if (!(minecraft.screen instanceof ChatScreen)) {
+                publicKeyDown = EsvoiceVoiceKeys.isBindingHeld(MiniKeys.PUBLIC_VOICE);
+            }
         }
         RadioTransmitController.update(channel, publicKeyDown, connected);
 
-        if (voiceConnected && RadioTransmitController.shouldActivateMicrophone()
+        if (voiceConnected && voiceEnabled && RadioTransmitController.shouldActivateMicrophone()
                 && !voiceState.isMuted() && !voiceState.isDisabled()) {
             VoiceChannel activeChannel = RadioTransmitController.getActiveChannel();
             UUID playerId = minecraft.player.getUUID();

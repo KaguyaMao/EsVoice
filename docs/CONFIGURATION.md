@@ -146,12 +146,14 @@ Esvoice 转发 Simple Voice Chat 已编码的 Opus 帧，不重新编码。因�
 ```json
 {
   "key.categories.esvoice": "Esvoice 语音",
-  "key.esvoice.public_voice": "本地语音（按住说话）",
+  "key.esvoice.toggle_recording": "切换语音录音",
   "hud.esvoice.channel.squad": "班组"
 }
 ```
 
 新增翻译时使用 `域.模组.名称` 风格，并在代码中通过 `Component.translatable("...")` 引用。
+（注：公共麦/小队/指挥/静音/总开关/头像条六个键位及其翻译已归 espetromini，见
+`key.espetromini.*`；Esvoice 只保留录音键 `key.esvoice.toggle_recording`。）
 
 ### `pack.mcmeta`
 
