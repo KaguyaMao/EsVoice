@@ -1,7 +1,9 @@
 package org.esvoice.client;
 
+import org.espetromini.api.MiniClientAPI;
+
 /**
- * 把配置里的接收增益应用到 Simple Voice Chat 解码后的 PCM 帧上。
+ * 把 espetromini 客户端配置里的接收增益应用到 Simple Voice Chat 解码后的 PCM 帧上。
  *
  * <p>加性放大超过 16bit 范围时按饱和裁剪（而不是回绕），否则会变成刺耳的爆音。
  */
@@ -18,7 +20,7 @@ public final class ReceiveGainController {
         if (audio == null || audio.length == 0) {
             return audio;
         }
-        double db = EsvoiceClientConfig.receiveGainDb();
+        double db = MiniClientAPI.receiveGainDb();
         if (Math.abs(db) < 0.01D) {
             return audio;
         }

@@ -12,8 +12,8 @@ import de.maxhenkel.voicechat.api.packets.StaticSoundPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import org.espetro.api.EspetroAPI;
-import org.espetro.team.SquadManager;
+import org.espetromini.api.MiniAPI;
+import org.espetromini.team.SquadManager;
 import org.esvoice.network.EsvoiceNetwork;
 import org.esvoice.network.VoiceModeAckPacket;
 import org.esvoice.network.VoiceSpeakingPacket;
@@ -58,11 +58,11 @@ public final class VoiceChannelRouter {
             return VoiceChannel.PUBLIC;
         }
 
-        if (requestedChannel == VoiceChannel.SQUAD && getPlayerSquadId(player.getUUID()) == SquadManager.NO_SQUAD) {
+        if (requestedChannel == VoiceChannel.SQUAD && MiniAPI.getSquadId(player.getUUID()) == SquadManager.NO_SQUAD) {
             denyRadio(player, NOT_IN_SQUAD_MESSAGE);
             return VoiceChannel.PUBLIC;
         }
-        if (requestedChannel == VoiceChannel.COMMAND && !isCommandAuthorized(player.getUUID())) {
+        if (requestedChannel == VoiceChannel.COMMAND && !MiniAPI.canUseCommandChannel(player.getUUID())) {
             denyRadio(player, COMMAND_DENIED_MESSAGE);
             return VoiceChannel.PUBLIC;
         }
@@ -139,10 +139,9 @@ public final class VoiceChannelRouter {
             return;
         }
 
-        // Hub (overworld) public mic is always open to every player in the lobby,
-        // not gated by Espetro faction or proximity. Spectators also need our path
-        // because SVC defaults spectator_interaction=false under MatchHold.
-        if (isHub(sender) || sender.isSpectator()) {
+        // Spectators still need our own routing path: SVC defaults
+        // spectator_interaction=false, which would mute them entirely.
+        if (sender.isSpectator()) {
             event.cancel();
             stream.enqueue(event.getPacket(), VoiceChannel.PUBLIC, opusAudio);
         }
@@ -201,8 +200,9 @@ public final class VoiceChannelRouter {
 
     private static void routePublicPacket(MinecraftServer server, VoicechatServerApi api, ServerPlayer sender,
                                           PlayerRoute senderRoute, StaticSoundPacket packet) {
-        boolean hub = isHub(sender);
         String senderTeam = senderRoute.team;
+        // 敌方邻近麦：由 /gamerule espetrominiEnemyHearProximity 决定（false = 屏蔽跨阵营）。
+        boolean enemiesAudible = MiniAPI.enemyHearsProximity(server);
         double range = Math.max(1.0D, api.getBroadcastRange());
         double rangeSq = range * range;
         // Spectators should still be audible at their camera position; use eye height.
@@ -214,25 +214,19 @@ public final class VoiceChannelRouter {
             if (listener == sender || listener.level() != sender.level()) {
                 continue;
             }
-            // Lobby: every player in the hub dimension hears public mic, no range/team gate.
-            if (!hub) {
-                if (listener.distanceToSqr(senderX, senderY, senderZ) > rangeSq) {
-                    continue;
-                }
-
-                PlayerRoute listenerRoute = PLAYER_ROUTES.get(listener.getUUID());
-                if (listenerRoute == null) {
-                    continue;
-                }
-                // Same-faction only when both sides have a faction. Unassigned players
-                // still hear each other so voice is not muted by missing Espetro state.
-                if (senderTeam != null && listenerRoute.team != null
-                        && !Objects.equals(senderTeam, listenerRoute.team)) {
-                    continue;
-                }
+            // 公共麦默认按距离衰减（与 SVC 的邻近判定一致）。
+            if (listener.distanceToSqr(senderX, senderY, senderZ) > rangeSq) {
+                continue;
             }
 
             PlayerRoute listenerRoute = PLAYER_ROUTES.get(listener.getUUID());
+            // 屏蔽跨阵营邻近麦时，双方都有阵营且不同才拦截；未分配的玩家不受影响。
+            if (!enemiesAudible && listenerRoute != null
+                    && senderTeam != null && listenerRoute.team != null
+                    && !Objects.equals(senderTeam, listenerRoute.team)) {
+                continue;
+            }
+
             VoicechatConnection connection = listenerRoute != null
                     ? listenerRoute.connection
                     : api.getConnectionOf(listener.getUUID());
@@ -243,12 +237,6 @@ public final class VoiceChannelRouter {
             api.sendStaticSoundPacketTo(connection, packet);
             notifyHud(listener, sender, VoiceChannel.PUBLIC);
         }
-    }
-
-    /** Espetro hub / lobby lives in the overworld; battlefield maps use other dimensions. */
-    private static boolean isHub(ServerPlayer player) {
-        return player != null && player.level() != null
-                && net.minecraft.world.level.Level.OVERWORLD.equals(player.level().dimension());
     }
 
     private static void routeSquadPacket(MinecraftServer server, VoicechatServerApi api, ServerPlayer sender,
@@ -287,18 +275,6 @@ public final class VoiceChannelRouter {
         EsvoiceNetwork.acknowledgeMode(player, new VoiceModeAckPacket(VoiceChannel.PUBLIC));
     }
 
-    private static String getPlayerTeam(ServerPlayer player) {
-        return EspetroAPI.getPlayerTeam(player);
-    }
-
-    private static int getPlayerSquadId(UUID playerId) {
-        return EspetroAPI.getPlayerSquadId(playerId);
-    }
-
-    private static boolean isCommandAuthorized(UUID playerId) {
-        return SquadManager.getInstance().isSquadLeader(playerId) || EspetroAPI.isCommander(playerId);
-    }
-
     private static void refreshPlayerRoutes(MinecraftServer server, VoicechatServerApi api) {
         int currentTick = server.getTickCount();
         if (routeCacheServer == server && routeCacheTick == currentTick) {
@@ -313,16 +289,16 @@ public final class VoiceChannelRouter {
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             UUID playerId = player.getUUID();
-            String team = getPlayerTeam(player);
-            int squadId = getPlayerSquadId(playerId);
-            boolean squadLeader = SquadManager.getInstance().isSquadLeader(playerId);
-            boolean commander = EspetroAPI.isCommander(playerId);
+            String team = MiniAPI.getTeamId(player);
+            int squadId = MiniAPI.getSquadId(playerId);
+            boolean squadLeader = MiniAPI.isSquadLeader(playerId);
+            boolean commander = MiniAPI.isCommander(playerId);
             PlayerRoute route = PLAYER_ROUTES.computeIfAbsent(playerId, ignored -> new PlayerRoute());
             route.team = team;
             route.squadId = squadId;
             route.squadLeader = squadLeader;
             route.commander = commander;
-            route.commandAuthorized = squadLeader || commander;
+            route.commandAuthorized = MiniAPI.canUseCommandChannel(playerId);
             route.connection = api.getConnectionOf(playerId);
         }
     }
@@ -340,15 +316,15 @@ public final class VoiceChannelRouter {
                 || !(receiverConnection.getPlayer().getPlayer() instanceof ServerPlayer listener)) {
             return;
         }
-        // Hub public proximity (if any packet still uses the default path) is open to everyone.
-        if (isHub(sender) || isHub(listener)) {
+        // 邻近麦已由 SVC 按距离筛过；这里只处理跨阵营屏蔽。
+        // /gamerule espetrominiEnemyHearProximity = true 时敌方也能听见，直接放行。
+        if (MiniAPI.enemyHearsProximity(sender.getServer())) {
             notifyHud(listener, sender, VoiceChannel.PUBLIC);
             return;
         }
-        String senderTeam = getPlayerTeam(sender);
-        String listenerTeam = getPlayerTeam(listener);
-        // Enemy factions never hear each other. Missing team is allowed so unassigned
-        // players are not effectively muted by Espetro state.
+        String senderTeam = MiniAPI.getTeamId(sender);
+        String listenerTeam = MiniAPI.getTeamId(listener);
+        // 不同阵营互相听不见；任一方没有阵营时不拦，避免未分配玩家被整体静音。
         if (senderTeam != null && listenerTeam != null && !Objects.equals(senderTeam, listenerTeam)) {
             event.cancel();
             return;

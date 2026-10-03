@@ -10,8 +10,6 @@
   "client": [
     "ChatComponentMixin",
     "KeyEventsMixin",
-    "ForgeVoicechatClientModMixin",
-    "MinecraftScreenMixin",
     "MicrophoneProcessorMixin",
     "RenderEventsMixin",
     "VoicechatKeyRegistrationMixin"

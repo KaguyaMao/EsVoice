@@ -1,6 +1,7 @@
 package org.esvoice.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -19,7 +20,6 @@ public final class EsvoiceClientEvents {
 
     private static UUID cachedPlayerId;
     private static String cachedPlayerName;
-    private static boolean tutorialShownThisConnection;
 
     private EsvoiceClientEvents() {
     }
@@ -38,23 +38,11 @@ public final class EsvoiceClientEvents {
             && !voiceState.isDisconnected()
             && voiceClient != null
             && voiceClient.getConnection() != null;
-        EsvoiceAuraTipNotifications.update(connected, voiceConnected);
 
-        boolean settingsClicked = EsvoiceClientModEvents.VOICE_SETTINGS.consumeClick();
         boolean muteClicked = EsvoiceClientModEvents.MUTE_MICROPHONE.consumeClick();
         boolean disableClicked = EsvoiceClientModEvents.DISABLE_VOICE.consumeClick();
         boolean hudClicked = EsvoiceClientModEvents.TOGGLE_HUD.consumeClick();
         boolean recordingClicked = EsvoiceClientModEvents.TOGGLE_RECORDING.consumeClick();
-
-        if (!connected) {
-            tutorialShownThisConnection = false;
-        } else if (voiceConnected && minecraft.screen == null && !tutorialShownThisConnection
-                && VoicechatClient.CLIENT_CONFIG != null && !EsvoiceTutorialScreen.isFinished()) {
-            tutorialShownThisConnection = true;
-            minecraft.setScreen(new EsvoiceTutorialScreen(null, false));
-        } else if (minecraft.screen == null && settingsClicked) {
-            minecraft.setScreen(new EsvoiceVoiceChatScreen());
-        }
 
         if (connected && minecraft.screen == null) {
             if (muteClicked) {
@@ -79,14 +67,13 @@ public final class EsvoiceClientEvents {
                 channel = VoiceChannel.SQUAD;
             }
         }
-        // 投票阶段玩家一直被投票界面挡着，KeyMapping 不会更新：
-        // 允许用 GLFW 轮询到的按键状态继续发本地（临近）语音。
+        // 界面打开时 KeyMapping 不会更新，改用 GLFW 直接轮询（聊天框里打字时不抢按键）。
         boolean publicKeyDown;
         if (minecraft.screen == null) {
             publicKeyDown = connected && EsvoiceClientModEvents.PUBLIC_VOICE.isDown();
         } else {
             publicKeyDown = connected
-                    && EsvoiceProximityGate.allowsProximityWithScreenOpen(minecraft)
+                    && !(minecraft.screen instanceof ChatScreen)
                     && EsvoiceVoiceKeys.isBindingHeld(EsvoiceClientModEvents.PUBLIC_VOICE);
         }
         RadioTransmitController.update(channel, publicKeyDown, connected);

@@ -68,26 +68,8 @@ versionRange = "[${voicechat_api_version},)"
 ordering = "AFTER"
 side = "BOTH"
 [[dependencies."${mod_id}"]]
-modId = "mutil"
+modId = "espetromini"
 mandatory = true
-versionRange = "[6.1.1,)"
-ordering = "AFTER"
-side = "BOTH"
-[[dependencies."${mod_id}"]]
-modId = "oelib"
-mandatory = true
-versionRange = "[${oelib_version},)"
-ordering = "AFTER"
-side = "BOTH"
-[[dependencies."${mod_id}"]]
-modId = "auratip"
-mandatory = true
-versionRange = "[${auratip_version},)"
-ordering = "AFTER"
-side = "BOTH"
-[[dependencies."${mod_id}"]]
-modId = "espetro"
-mandatory = true
-versionRange = "[${espetro_version},)"
+versionRange = "[${espetromini_version},)"
 ordering = "AFTER"
 side = "BOTH"

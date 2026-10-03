@@ -7,6 +7,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.resources.ResourceLocation;
+import org.espetromini.api.MiniClientAPI;
 import org.esvoice.voice.VoiceChannel;
 
 import java.util.ArrayList;
@@ -65,6 +66,7 @@ public final class VoiceSpeakerHud {
     public static synchronized void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.options.hideGui || minecraft.player == null
+                || !MiniClientAPI.showSpeakerHud()
                 || VoicechatClient.CLIENT_CONFIG == null
                 || VoicechatClient.CLIENT_CONFIG.hideIcons.get()) {
             return;

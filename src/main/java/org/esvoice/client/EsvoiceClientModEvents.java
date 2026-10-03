@@ -19,8 +19,6 @@ public final class EsvoiceClientModEvents {
             "key.esvoice.squad_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, "key.categories.esvoice");
     public static final KeyMapping COMMAND_VOICE = new KeyMapping(
             "key.esvoice.command_voice", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, "key.categories.esvoice");
-    public static final KeyMapping VOICE_SETTINGS = new KeyMapping(
-            "key.esvoice.voice_settings", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, "key.categories.esvoice");
     public static final KeyMapping MUTE_MICROPHONE = new KeyMapping(
             "key.esvoice.mute_microphone", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_M, "key.categories.esvoice");
     public static final KeyMapping DISABLE_VOICE = new KeyMapping(
@@ -34,7 +32,6 @@ public final class EsvoiceClientModEvents {
             PUBLIC_VOICE,
             SQUAD_VOICE,
             COMMAND_VOICE,
-            VOICE_SETTINGS,
             MUTE_MICROPHONE,
             DISABLE_VOICE,
             TOGGLE_HUD,
@@ -49,7 +46,6 @@ public final class EsvoiceClientModEvents {
         event.register(PUBLIC_VOICE);
         event.register(SQUAD_VOICE);
         event.register(COMMAND_VOICE);
-        event.register(VOICE_SETTINGS);
         event.register(MUTE_MICROPHONE);
         event.register(DISABLE_VOICE);
         event.register(TOGGLE_HUD);

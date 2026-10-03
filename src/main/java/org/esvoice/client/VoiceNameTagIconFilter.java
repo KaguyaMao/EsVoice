@@ -4,15 +4,15 @@ import de.maxhenkel.voicechat.api.events.NameTagIconRenderEvent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.scores.Team;
-import org.espetro.client.gui.ClientGameState;
-import org.espetro.team.TeamManager;
 
 import java.util.UUID;
 
+/**
+ * 语音图标只对本方可见：判定完全基于原版计分板队伍（= espetromini 的阵营）。
+ *
+ * <p>轻量化后单一维度、没有"大厅"概念，因此这里不再有任何维度特例。
+ */
 public final class VoiceNameTagIconFilter {
-
-    private static final String ATTACK_TEAM = "ATTACK";
-    private static final String DEFEND_TEAM = "DEFEND";
 
     private VoiceNameTagIconFilter() {
     }
@@ -36,34 +36,13 @@ public final class VoiceNameTagIconFilter {
         if (target == minecraft.player || target.getUUID().equals(minecraft.player.getUUID())) {
             return true;
         }
-        // Lobby / hub: show speak icons for everyone so public mic is not faction-gated.
-        if (net.minecraft.world.level.Level.OVERWORLD.equals(minecraft.level.dimension())) {
-            return true;
-        }
-        return isSameEspetroTeam(minecraft.player, target);
+        return isSameScoreboardTeam(minecraft.player, target);
     }
 
-    private static boolean isSameEspetroTeam(Player localPlayer, Player targetPlayer) {
-        String localScoreboardTeam = teamName(localPlayer.getTeam());
-        String targetScoreboardTeam = teamName(targetPlayer.getTeam());
-
-        if (isEspetroScoreboardTeam(localScoreboardTeam)) {
-            return localScoreboardTeam.equals(targetScoreboardTeam);
-        }
-
-        String localEspetroTeam = ClientGameState.getPlayerTeam();
-        if (localEspetroTeam == null || targetScoreboardTeam == null) {
-            return false;
-        }
-        return ATTACK_TEAM.equals(localEspetroTeam) && TeamManager.ATTACK_TEAM_ID.equals(targetScoreboardTeam)
-                || DEFEND_TEAM.equals(localEspetroTeam) && TeamManager.DEFEND_TEAM_ID.equals(targetScoreboardTeam);
-    }
-
-    private static String teamName(Team team) {
-        return team == null ? null : team.getName();
-    }
-
-    private static boolean isEspetroScoreboardTeam(String teamName) {
-        return TeamManager.ATTACK_TEAM_ID.equals(teamName) || TeamManager.DEFEND_TEAM_ID.equals(teamName);
+    /** 只有双方都在同一个原版队伍里才显示；无队伍的玩家不显示（与原行为一致）。 */
+    private static boolean isSameScoreboardTeam(Player localPlayer, Player targetPlayer) {
+        Team localTeam = localPlayer.getTeam();
+        Team targetTeam = targetPlayer.getTeam();
+        return localTeam != null && targetTeam != null && localTeam.getName().equals(targetTeam.getName());
     }
 }
