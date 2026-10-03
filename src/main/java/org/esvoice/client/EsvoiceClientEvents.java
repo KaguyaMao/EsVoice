@@ -9,6 +9,8 @@ import net.minecraftforge.fml.common.Mod;
 import de.maxhenkel.voicechat.voice.client.ClientManager;
 import de.maxhenkel.voicechat.voice.client.ClientPlayerStateManager;
 import de.maxhenkel.voicechat.voice.client.ClientVoicechat;
+import de.maxhenkel.voicechat.VoicechatClient;
+import de.maxhenkel.voicechat.Voicechat;
 import org.espetromini.api.MiniClientAPI;
 import org.espetromini.client.MiniKeys;
 import org.espetromini.config.MiniClientConfig;
@@ -83,6 +85,16 @@ public final class EsvoiceClientEvents {
             if (lastPushedDisabled == null || lastPushedDisabled != disabled) {
                 lastPushedDisabled = disabled;
                 voiceState.setDisabled(disabled);
+            }
+        }
+
+        // 自愈：Simple Voice Chat 自带的「隐藏图标」会把我们的发言者头像条一起关掉
+        // （VoiceSpeakerHud 的第一道判断就 return）。只要我们的开关是开的，就纠正一次，
+        // 让「语音 + UI 默认开启」在玩家配置被改乱后仍能生效。
+        if (connected && MiniClientAPI.showSpeakerHud()) {
+            if (VoicechatClient.CLIENT_CONFIG != null && VoicechatClient.CLIENT_CONFIG.hideIcons.get()) {
+                VoicechatClient.CLIENT_CONFIG.hideIcons.set(false).save();
+                Voicechat.LOGGER.info("已自动关闭 Simple Voice Chat 的「隐藏图标」(hide_icons)，否则发言者头像条不会显示");
             }
         }
 
