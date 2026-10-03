@@ -5,6 +5,7 @@
 | 配置 | 位置 | 作用 | 重载方式 |
 | --- | --- | --- | --- |
 | Esvoice Forge 配置 | `config/esvoice-common.toml` | 当前仅保留 Forge 示例字段 | 重启游戏/服务器 |
+| Esvoice 客户端配置 | `config/esvoice-client.toml` | 接收增益 `receive_gain_db`（默认 `+20` dB） | 重启游戏，或在设置中心“音频”页即时调整 |
 | Simple Voice Chat 服务端配置 | 世界目录 `serverconfig/voicechat-server.toml` 或插件实际生成路径 | 语音端口、距离、编解码和服务端策略 | 按 Simple Voice Chat 规则重载 |
 | Simple Voice Chat 客户端配置 | `config/voicechat/voicechat-client.properties` | 输入输出设备、音量、激活方式、缓冲与 HUD | Esvoice 设置中心即时保存 |
 | 玩家/分类音量 | `config/voicechat/player-volumes.properties`、`category-volumes.properties` | 玩家和语音分类音量 | Esvoice“音量”页即时保存 |
@@ -13,6 +14,27 @@
 Esvoice 没有用于语音频道权限或距离的业务 JSON。频道成员由 Espetro 的实时状态决定，音频质量和基础近距离语音由 Simple Voice Chat 决定。
 Simple Voice Chat 的原生设置页、首次向导和键位注册均被禁用，但其客户端配置文件继续作为音频后端的持久化来源。
 Esvoice“高级”页还覆盖录音质量/目录、群组与状态 HUD、假玩家显示、原生音频库、Java 麦克风实现及 macOS 权限检查；标注需要重启的选项不会热重载。
+
+## 接收增益（`esvoice-client.toml`）
+
+Simple Voice Chat 自己的总音量（`voice_chat_volume`）上限是 `3.0`，约等于 `+9.5 dB`，再往上没有可调项。
+因此 Esvoice 增加了一个客户端接收增益，在解码后的 PCM 上再放大一次：
+
+| 字段 | 类型 | 默认值 | 范围 | 说明 |
+| --- | --- | --- | --- | --- |
+| `receive_gain_db` | Double | `20.0` | `-40.0` ~ `40.0` | 收到的语音额外放大；`0` = 不额外放大，`+20` ≈ 放大 10 倍 |
+
+- 放大在 Simple Voice Chat 的“收到声音”事件里完成（`ClientReceiveSoundEvent`），对临近、小队、指挥频道一视同仁。
+- 超过 16bit 动态范围时按饱和裁剪，避免回绕成爆音；如果整体过响，请下调 `receive_gain_db` 或 SVC 的接收音量。
+- 设置中心“音频”页有对应滑块，改动即时保存。
+
+## 投票阶段的临近语音
+
+投票阶段（地图投票、地图揭示、指挥官投票）玩家一直开着投票界面，Minecraft 在没有界面时才会更新按键状态，
+所以按住说话的 `KeyMapping` 会失效。Esvoice 在这几个阶段改用 GLFW 直接读取按键状态，让本地（临近）语音照常可用：
+
+- 只放开本地/临近语音；小队与指挥频道仍然需要关闭界面才能发射，避免在界面里误触无线电。
+- 聊天框打开时不生效，避免打字时触发语音。
 
 ## 构建配置
 

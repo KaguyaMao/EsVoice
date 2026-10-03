@@ -54,6 +54,7 @@
   "gui.esvoice.channel.command.desc": "Radio · Leaders and commander",
   "gui.esvoice.tutorial.open": "Replay beginner tutorial",
   "gui.esvoice.volume.master": "Receive volume: %s",
+  "gui.esvoice.volume.receive_gain": "Receive gain: %s",
   "gui.esvoice.output.mode": "Output mode: %s",
   "gui.esvoice.microphone.gain": "Microphone gain: %s",
   "gui.esvoice.agc": "Auto gain",

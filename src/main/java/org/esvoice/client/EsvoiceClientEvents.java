@@ -79,8 +79,16 @@ public final class EsvoiceClientEvents {
                 channel = VoiceChannel.SQUAD;
             }
         }
-        boolean publicKeyDown = connected && minecraft.screen == null
-                && EsvoiceClientModEvents.PUBLIC_VOICE.isDown();
+        // 投票阶段玩家一直被投票界面挡着，KeyMapping 不会更新：
+        // 允许用 GLFW 轮询到的按键状态继续发本地（临近）语音。
+        boolean publicKeyDown;
+        if (minecraft.screen == null) {
+            publicKeyDown = connected && EsvoiceClientModEvents.PUBLIC_VOICE.isDown();
+        } else {
+            publicKeyDown = connected
+                    && EsvoiceProximityGate.allowsProximityWithScreenOpen(minecraft)
+                    && EsvoiceVoiceKeys.isBindingHeld(EsvoiceClientModEvents.PUBLIC_VOICE);
+        }
         RadioTransmitController.update(channel, publicKeyDown, connected);
 
         if (voiceConnected && RadioTransmitController.shouldActivateMicrophone()

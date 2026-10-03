@@ -207,6 +207,15 @@ public final class EsvoiceVoiceChatScreen extends EsvoiceMutilScreen {
                 () -> Component.translatable("gui.esvoice.volume.master",
                         Math.round(VoicechatClient.CLIENT_CONFIG.voiceChatVolume.get() * 100D) + "%")));
         y += 25;
+        // 接收增益：Simple Voice Chat 总音量上限只有 3.0（≈ +9.5 dB），再响只能由 Esvoice 放大 PCM。
+        content.addChild(EsvoiceMutilWidgets.slider(x, y, w, 20,
+                EsvoiceClientConfig.MIN_RECEIVE_GAIN_DB,
+                EsvoiceClientConfig.MAX_RECEIVE_GAIN_DB,
+                EsvoiceClientConfig::receiveGainDb,
+                value -> EsvoiceClientConfig.setReceiveGainDb(Math.rint(value)),
+                () -> Component.translatable("gui.esvoice.volume.receive_gain",
+                        signed(EsvoiceClientConfig.receiveGainDb()) + " dB")));
+        y += 25;
         content.addChild(EsvoiceMutilWidgets.button(x, y, w, 19,
                 () -> Component.translatable("gui.esvoice.output.mode",
                         VoicechatClient.CLIENT_CONFIG.audioType.get().getText()),

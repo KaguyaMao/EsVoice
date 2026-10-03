@@ -3,6 +3,7 @@ package org.esvoice;
 import de.maxhenkel.voicechat.api.ForgeVoicechatPlugin;
 import de.maxhenkel.voicechat.api.VoicechatApi;
 import de.maxhenkel.voicechat.api.VoicechatPlugin;
+import de.maxhenkel.voicechat.api.events.ClientReceiveSoundEvent;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.NameTagIconRenderEvent;
 import org.esvoice.voice.VoiceChannelRouter;
@@ -34,6 +35,13 @@ public final class EsvoiceVoicechatPlugin implements VoicechatPlugin {
     public void registerEvents(EventRegistration registration) {
         VoiceChannelRouter.registerEvents(registration);
         registration.registerEvent(NameTagIconRenderEvent.class, EsvoiceVoicechatPlugin::onNameTagIconRender);
+        // 接收增益：放大的对象是"收到的语音"，只在客户端触发（专用服务器不会收到这些事件）。
+        registration.registerEvent(ClientReceiveSoundEvent.EntitySound.class,
+                EsvoiceVoicechatPlugin::onClientReceiveSound);
+        registration.registerEvent(ClientReceiveSoundEvent.LocationalSound.class,
+                EsvoiceVoicechatPlugin::onClientReceiveSound);
+        registration.registerEvent(ClientReceiveSoundEvent.StaticSound.class,
+                EsvoiceVoicechatPlugin::onClientReceiveSound);
     }
 
     public static VoicechatApi getVoicechatApi() {
@@ -42,6 +50,34 @@ public final class EsvoiceVoicechatPlugin implements VoicechatPlugin {
 
     private static void onNameTagIconRender(NameTagIconRenderEvent event) {
         ClientIconFilterHandler.handle(event);
+    }
+
+    private static void onClientReceiveSound(ClientReceiveSoundEvent event) {
+        ClientReceiveGainHandler.apply(event);
+    }
+
+    /** Loaded lazily only when Simple Voice Chat fires the client-only receive events. */
+    private static final class ClientReceiveGainHandler {
+        private static final MethodHandle APPLY = findHandler();
+
+        private static MethodHandle findHandler() {
+            try {
+                return MethodHandles.publicLookup().findStatic(
+                        Class.forName("org.esvoice.client.ClientReceiveGainHandler"),
+                        "apply",
+                        MethodType.methodType(void.class, ClientReceiveSoundEvent.class));
+            } catch (ReflectiveOperationException exception) {
+                throw new ExceptionInInitializerError(exception);
+            }
+        }
+
+        private static void apply(ClientReceiveSoundEvent event) {
+            try {
+                APPLY.invokeExact(event);
+            } catch (Throwable throwable) {
+                throw new IllegalStateException("Failed to apply receive gain", throwable);
+            }
+        }
     }
 
     /** Loaded lazily only when Simple Voice Chat fires the client-only render event. */

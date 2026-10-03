@@ -25,6 +25,7 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
@@ -88,6 +89,10 @@ public class Esvoice {
 
         // Register our mod's ForgeConfigSpec so that Forge can create and load the config file for us
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        // 客户端音频设置（接收增益）：只在客户端注册，专用服务器不会生成该文件。
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, org.esvoice.client.EsvoiceClientConfig.SPEC);
+        }
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

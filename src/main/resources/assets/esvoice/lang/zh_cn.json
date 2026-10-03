@@ -54,6 +54,7 @@
   "gui.esvoice.channel.command.desc": "无线电 · 队长与指挥官",
   "gui.esvoice.tutorial.open": "重新播放新手教程",
   "gui.esvoice.volume.master": "接收音量：%s",
+  "gui.esvoice.volume.receive_gain": "接收增益：%s",
   "gui.esvoice.output.mode": "输出模式：%s",
   "gui.esvoice.microphone.gain": "麦克风增益：%s",
   "gui.esvoice.agc": "自动增益",
