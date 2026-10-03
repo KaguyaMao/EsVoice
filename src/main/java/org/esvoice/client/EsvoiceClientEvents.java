@@ -23,6 +23,17 @@ public final class EsvoiceClientEvents {
     private static UUID cachedPlayerId;
     private static String cachedPlayerName;
 
+    /**
+     * 上一次推送给 Simple Voice Chat 的状态。
+     *
+     * <p>**必须**只与我们自己记录的值比较：SVC 的 {@code isDisabled()} 在语音尚未连接/不可用时
+     * 会返回 {@code true}，而 {@code setDisabled()} 每次都写配置文件并发送 {@code UpdateStatePacket}。
+     * 若拿 SVC 的 getter 做比较，玩家想开语音时会每 tick 重设一次 → 包速率超限被 SVC 踢出
+     * （日志：{@code [voicechat] Player xxx exceeded packet rate limit}）。
+     */
+    private static Boolean lastPushedMuted;
+    private static Boolean lastPushedDisabled;
+
     private EsvoiceClientEvents() {
     }
 
@@ -60,13 +71,17 @@ public final class EsvoiceClientEvents {
         boolean voiceEnabled = MiniClientAPI.voiceEnabled();
         // 把 espetromini 的语音状态同步给 Simple Voice Chat：
         // 总开关关闭 → 不听也不说（disabled）；麦克风静音 → 只影响"说"（muted）。
-        if (connected) {
+        // 仅在「我们自己记录的上次推送值」变化时推送一次（SVC 的 getter 不能用作比较基准，
+        // 否则未连接时 isDisabled() 恒为 true 会导致每 tick 发包 + 写盘，被 SVC 限速踢出）。
+        if (connected && voiceConnected) {
             boolean muted = MiniClientAPI.micMuted();
             boolean disabled = !voiceEnabled;
-            if (voiceState.isMuted() != muted) {
+            if (lastPushedMuted == null || lastPushedMuted != muted) {
+                lastPushedMuted = muted;
                 voiceState.setMuted(muted);
             }
-            if (voiceState.isDisabled() != disabled) {
+            if (lastPushedDisabled == null || lastPushedDisabled != disabled) {
+                lastPushedDisabled = disabled;
                 voiceState.setDisabled(disabled);
             }
         }
